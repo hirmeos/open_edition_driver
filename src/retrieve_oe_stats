@@ -46,10 +46,11 @@ def print_oe_csv(token, publisher, month):
 
     try:
         report = urllib2.urlopen(url)
-        assert report.getcode() == 200
+        http_code = report.getcode()
+        assert http_code == 200
     except (AssertionError, urllib2.URLError):
         m = "Could not retrieve OE report (%d): %s"
-        sys.stderr.write(m % (res.status, url))
+        sys.stderr.write(m % (http_code, url))
         return
     buff = csv.reader(report)
     return print_results(buff)
