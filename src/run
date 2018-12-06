@@ -21,11 +21,7 @@ def instream(filename):
     return open(filename, "r")
 
 
-def get_cache_filename(odir, name, d):
-    return "%s/%s_%s.csv" % (odir, name, d)
-
-
-def get_output_filename(odir, d):
+def get_filename(odir, d):
     return "%s/OpenEdition_%s.csv" % (odir, d)
 
 
@@ -61,49 +57,50 @@ def exists_and_not_empty(filename):
 
 
 def run():
-    # get last date to query (last whole month)
+    # get last date to query (last whole month) and the first (earliest)
     now = datetime.now()
     last_month = now.month - 1 if now.month > 1 else 12
     year = now.year if last_month < 12 else now.year - 1
     cutoff_date = "%s-%s-%s" % (year, last_month, "01")
-
-    # cache Open Edition reports for all MODES
-    for m in MODES:
-        for day in generate_dates(m['startDate'], cutoff_date):
-            date = day.strftime('%Y-%m-%d')
-            month = day.strftime('%Y%m')
-            cache_file = get_cache_filename(CACHEDIR, m['name'], date)
-            try:
-                assert not exists_and_not_empty(cache_file)
-            except AssertionError:
-                continue
-            cmd = ['./retrieve_oe_stats',
-                   '--token', OE_API_TOKEN,
-                   '--publisher', OE_API_PUBLISHER,
-                   '--month', month]
-            subprocess.call(cmd, stdout=outstream(cache_file))
-
     earliest_date = get_earliest([m['startDate'] for m in MODES])
+
+    # cache Open Edition reports
     for day in generate_dates(earliest_date, cutoff_date):
         date = day.strftime('%Y-%m-%d')
-        out_file = get_output_filename(OUTDIR, date)
+        month = day.strftime('%Y%m')
+        cache_file = get_filename(CACHEDIR, date)
+        try:
+            assert not exists_and_not_empty(cache_file)
+        except AssertionError:
+            continue
+        cmd = ['./retrieve_oe_stats',
+               '--token', OE_API_TOKEN,
+               '--publisher', OE_API_PUBLISHER,
+               '--month', month]
+        subprocess.call(cmd, stdout=outstream(cache_file))
+
+    for day in generate_dates(earliest_date, cutoff_date):
+        date = day.strftime('%Y-%m-%d')
+        out_file = get_filename(OUTDIR, date)
 
         # continue if output file already exists
         if exists_and_not_empty(out_file):
             continue
 
+        cache_file = get_filename(CACHEDIR, date)
+        # at this point all *relevant* cache files must exists
+        if not exists_and_not_empty(cache_file):
+            continue
+
         i = 0
+        input_stream = instream(cache_file)
         output_stream = outstream(out_file)
         for m in MODES:
-            cache_file = get_cache_filename(CACHEDIR, m['name'], date)
-            # at this point all *relevant* cache files must exists
-            if not exists_and_not_empty(cache_file):
-                continue
-            input_stream = instream(cache_file)
             headers = i == 0  # only include headers in first iteration
             i += 1
             add_headers = ['--add-headers'] if headers else []
             cmd = ['./resolve_reports',
+                   '--regex', m['regex'][0],
                    '--measure', m['measure']] + add_headers
             subprocess.call(cmd, stdout=output_stream, stdin=input_stream)
 
