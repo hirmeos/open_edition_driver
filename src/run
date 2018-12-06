@@ -77,8 +77,10 @@ def run():
                 assert not exists_and_not_empty(cache_file)
             except AssertionError:
                 continue
-            cmd = ['./retrieve_oe_stats', '--token', OE_API_TOKEN,
-                   '--publisher', OE_API_PUBLISHER, '--month', month]
+            cmd = ['./retrieve_oe_stats',
+                   '--token', OE_API_TOKEN,
+                   '--publisher', OE_API_PUBLISHER,
+                   '--month', month]
             subprocess.call(cmd, stdout=outstream(cache_file))
 
     earliest_date = get_earliest([m['startDate'] for m in MODES])
