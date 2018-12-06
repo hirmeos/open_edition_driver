@@ -104,8 +104,7 @@ def run():
             i += 1
             add_headers = ['--add-headers'] if headers else []
             cmd = ['./resolve_reports',
-                   '--measure', m['measure'],
-                   '--date', date] + add_headers
+                   '--measure', m['measure']] + add_headers
             subprocess.call(cmd, stdout=output_stream, stdin=input_stream)
 
 
