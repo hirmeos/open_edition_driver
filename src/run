@@ -79,6 +79,7 @@ def run():
                '--month', month]
         subprocess.call(cmd, stdout=outstream(cache_file))
 
+    # normalise reports
     for day in generate_dates(earliest_date, cutoff_date):
         date = day.strftime('%Y-%m-%d')
         out_file = get_filename(OUTDIR, date)

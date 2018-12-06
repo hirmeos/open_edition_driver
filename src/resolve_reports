@@ -1,0 +1,144 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+import re
+import os
+import sys
+import csv
+import json
+import httplib2
+import unicodecsv
+from datetime import datetime
+from optparse import OptionParser
+
+
+COUNTRY_API_ENDP = os.environ['COUNTRY_API_ENDP']
+URI_API_ENDP = os.environ['URI_API_ENDP']
+URI_API_USER = os.environ['URI_API_USER']
+URI_API_PASS = os.environ['URI_API_PASS']
+AUTH_API_ENDP = os.environ['AUTH_API_ENDP']
+URI_SCHEME = os.environ['URI_SCHEME']
+URI_STRICT = os.environ['URI_STRICT']
+EXCLUDED_URLS = json.loads(os.getenv('EXCLUDED_URLS'))
+IGNORED_TYPES = json.loads(os.getenv('IGNORED_TYPES'))
+CLEAN_FILE_TYPE = os.environ['CLEAN_FILE_TYPE'] == "true"
+ARGS = [
+    {
+        'val': '--measure',
+        'dest': 'measure',
+        'action': 'store',
+        'default': None,
+        'help': 'Measure URI, e.g. tag:operas.eu,2018:readership:open-edition'
+    }, {
+        'val': '--regex',
+        'dest': 'regex',
+        'action': 'store',
+        'default': [],
+        'help': 'Regex to parse URLs'
+    }, {
+        'val': '--add-headers',
+        'dest': 'add_headers',
+        'action': 'store_true',
+        'default': [],
+        'help': 'Whether to print report headers'
+    }
+]
+
+
+def get_options(args):
+    parser = OptionParser()
+    for arg in args:
+        parser.add_option(arg['val'], dest=arg['dest'],
+                          action=arg['action'], help=arg['help'])
+    options, rest = parser.parse_args()
+
+    assert rest == []
+    assert options.measure and options.regex
+    return options
+
+
+def get_token(url, email, passwd):
+    h = httplib2.Http()
+    credentials = {'email': email, 'password': passwd}
+    headers = {'content-type': 'application/json'}
+    res, content = h.request(url, 'POST', json.dumps(credentials), headers)
+    try:
+        assert res.status == 200
+    except AssertionError:
+        raise ValueError(content)
+    return json.loads(content)['data'][0]['token']
+
+
+def url_to_id(url, wtype, timestamp):
+    req = "%s?uri=%s&filter=uri_scheme:%s&strict=%s" \
+          % (URI_API_ENDP, url, URI_SCHEME, URI_STRICT)
+    h = httplib2.Http()
+    res, content = h.request(req, 'GET', headers={'Authorization': AUTH})
+    try:
+        assert res.status == 200
+    except AssertionError:
+        if url in EXCLUDED_URLS or wtype in IGNORED_TYPES:
+            return []
+        r = json.loads(content)
+        print >>sys.stderr, "%s: %s (%s)" % (r['message'],
+                                             r['parameters']['uri'], timestamp)
+        return []
+
+    return json.loads(content)['data']
+
+
+def sanitise_url(url, regex):
+    return re.search(re.compile(regex), url).group(0)
+
+
+def resolve(regex):
+    r = csv.reader(sys.stdin)
+    next(r, None)  # skip the headers
+
+    for row in r:
+        publisher, date, views, wtype, isbn, url = row[0].strip().split("\t")
+
+        try:
+            # unclassified rows correspond to book homepages
+            assert wtype and isbn
+        except AssertionError:
+            continue
+
+        datetime_obj = datetime.strptime(date, '%Y%m')
+        timestamp = datetime_obj.strftime('%Y-%m-%d 00:00:00')
+
+        try:
+            clean_url = sanitise_url(url, regex)
+            assert clean_url
+        except (AttributeError, AssertionError):
+            continue
+
+        if CLEAN_FILE_TYPE:
+            clean_url = clean_url.replace("/pdf", "").replace("/epub", "")
+
+        for identifier in url_to_id(clean_url, wtype, date):
+            uri = identifier['URI']
+            yield (timestamp, uri, views)
+
+
+def run(measure, add_headers, regex):
+    hits = {}
+    for timestamp, uri, value in resolve(regex):
+        key = (timestamp, uri)
+        if key not in hits:
+            hits[key] = 0
+        hits[key] += int(value)
+
+    w = unicodecsv.writer(sys.stdout)
+    if add_headers and hits:
+        w.writerow(('Measure', 'Timestamp', 'URI', 'Country', 'Value'))
+    for key, value in hits.iteritems():
+        row = tuple([measure] + list(key) + [''] + [value])
+        w.writerow(row)
+
+
+API_JWTOKEN = get_token(AUTH_API_ENDP, URI_API_USER, URI_API_PASS)
+AUTH = 'Bearer ' + API_JWTOKEN
+
+if __name__ == '__main__':
+    options = get_options(ARGS)
+    run(options.measure, options.add_headers, options.regex)
