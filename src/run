@@ -11,6 +11,7 @@ OE_API_TOKEN = os.environ['OE_API_TOKEN']
 OE_API_PUBLISHER = os.environ['OE_API_PUBLISHER']
 OUTDIR = os.environ['OUTDIR']
 CACHEDIR = os.environ['CACHEDIR']
+REPROCESS_REPORTS = os.environ['REPROCESS_REPORTS'] == 'true'
 
 
 def outstream(filename):
@@ -93,7 +94,7 @@ def run():
         out_file = get_filename(OUTDIR, date)
 
         # continue if output file already exists
-        if exists_and_not_empty(out_file):
+        if exists_and_not_empty(out_file) and not REPROCESS_REPORTS:
             continue
 
         cache_file = get_filename(CACHEDIR, date)
