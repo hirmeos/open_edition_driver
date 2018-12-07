@@ -1,0 +1,78 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import sys
+import csv
+import urllib2
+import unicodecsv
+from optparse import OptionParser
+
+OE_LOGS_ROOT = "https://usages.openedition.org/getLogs.php"
+OE_NODATA_MSG = "Data unavailable for pubisher"
+
+
+ARGS = [
+    {
+        'val': '--month',
+        'dest': 'month',
+        'action': 'store',
+        'help': 'Month and year to query, as YYYYmm'
+    }, {
+        'val': '--token',
+        'dest': 'token',
+        'action': 'store',
+        'help': 'Open Edition API Token'
+    }, {
+        'val': '--publisher',
+        'dest': 'publisher',
+        'action': 'store',
+        'help': 'Shortname of publisher, as provided by Open Edition'
+    }
+]
+
+
+def print_results(report_buffer):
+    w = unicodecsv.writer(sys.stdout)
+    for row in report_buffer:
+        if row[0][:len(OE_NODATA_MSG)] == OE_NODATA_MSG:
+            # if there's no data available we want an empty report
+            continue
+        w.writerow(row)
+
+
+def print_oe_csv(token, publisher, month):
+    url = "%s?publisher=%s&key=%s&month=%s" \
+        % (OE_LOGS_ROOT, publisher, token, month)
+
+    try:
+        report = urllib2.urlopen(url)
+        http_code = report.getcode()
+        assert http_code == 200
+    except (AssertionError, urllib2.URLError):
+        m = "Could not retrieve OE report (%d): %s"
+        sys.stderr.write(m % (http_code, url))
+        return
+    buff = csv.reader(report)
+    return print_results(buff)
+
+
+def get_options(args):
+    parser = OptionParser()
+    for arg in args:
+        parser.add_option(arg['val'], dest=arg['dest'],
+                          action=arg['action'], help=arg['help'])
+    options, rest = parser.parse_args()
+
+    assert rest == []
+    assert options.token and options.publisher and options.month
+    return options
+
+
+def run():
+    sys.stdin.close()
+    options = get_options(ARGS)
+    print_oe_csv(options.token, options.publisher, options.month)
+
+
+if __name__ == '__main__':
+    run()
