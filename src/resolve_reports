@@ -40,6 +40,12 @@ ARGS = [
         'action': 'store_true',
         'default': [],
         'help': 'Whether to print report headers'
+    }, {
+        'val': '--exclude-type',
+        'dest': 'excluded_types',
+        'action': 'append',
+        'default': [],
+        'help': 'OE types to ignore in this analysis'
     }
 ]
 
@@ -90,7 +96,7 @@ def sanitise_url(url, regex):
     return re.search(re.compile(regex), url).group(0)
 
 
-def resolve(regex):
+def resolve(regex, excluded_types=[]):
     r = csv.reader(sys.stdin)
     next(r, None)  # skip the headers
 
@@ -100,6 +106,7 @@ def resolve(regex):
         try:
             # unclassified rows correspond to book homepages
             assert wtype and isbn
+            assert wtype not in excluded_types
         except AssertionError:
             continue
 
@@ -120,9 +127,9 @@ def resolve(regex):
             yield (timestamp, uri, views)
 
 
-def run(measure, add_headers, regex):
+def run(measure, add_headers, regex, excluded_types):
     hits = {}
-    for timestamp, uri, value in resolve(regex):
+    for timestamp, uri, value in resolve(regex, excluded_types):
         key = (timestamp, uri)
         if key not in hits:
             hits[key] = 0
@@ -141,4 +148,5 @@ AUTH = 'Bearer ' + API_JWTOKEN
 
 if __name__ == '__main__':
     options = get_options(ARGS)
-    run(options.measure, options.add_headers, options.regex)
+    run(options.measure, options.add_headers, options.regex,
+        options.excluded_types if options.excluded_types else [])
