@@ -56,6 +56,14 @@ def exists_and_not_empty(filename):
         return False
 
 
+def compile_config(config_list):
+    vals = []
+    for c in config_list:
+        vals.append('--' + c['name'])
+        vals.append(c['value'])
+    return vals
+
+
 def run():
     # get last date to query (last whole month) and the first (earliest)
     now = datetime.now()
@@ -94,15 +102,16 @@ def run():
             continue
 
         i = 0
-        input_stream = instream(cache_file)
         output_stream = outstream(out_file)
         for m in MODES:
+            input_stream = instream(cache_file)
             headers = i == 0  # only include headers in first iteration
             i += 1
             add_headers = ['--add-headers'] if headers else []
+            config = compile_config(m['config']) if 'config' in m else []
             cmd = ['./resolve_reports',
                    '--regex', m['regex'][0],
-                   '--measure', m['measure']] + add_headers
+                   '--measure', m['measure']] + add_headers + config
             subprocess.call(cmd, stdout=output_stream, stdin=input_stream)
 
 
