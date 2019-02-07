@@ -11,7 +11,6 @@ from datetime import datetime
 from optparse import OptionParser
 
 
-COUNTRY_API_ENDP = os.environ['COUNTRY_API_ENDP']
 URI_API_ENDP = os.environ['URI_API_ENDP']
 URI_API_USER = os.environ['URI_API_USER']
 URI_API_PASS = os.environ['URI_API_PASS']
@@ -137,9 +136,10 @@ def run(measure, add_headers, regex, excluded_types):
 
     w = unicodecsv.writer(sys.stdout)
     if add_headers and hits:
-        w.writerow(('Measure', 'Timestamp', 'URI', 'Country', 'Value'))
+        w.writerow(('measure_id', 'timestamp', 'work_uri',
+                    'country_uri', 'event_uri', 'value'))
     for key, value in hits.iteritems():
-        row = tuple([measure] + list(key) + [''] + [value])
+        row = tuple([measure] + list(key) + [''] + [''] + [value])
         w.writerow(row)
 
 
