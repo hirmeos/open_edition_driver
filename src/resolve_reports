@@ -69,8 +69,8 @@ def get_token(url, email, passwd):
     try:
         assert res.status == 200
     except AssertionError:
-        raise ValueError(content)
-    return json.loads(content)['data'][0]['token']
+        raise ValueError(content.decode('utf-8'))
+    return json.loads(content.decode('utf-8'))['data'][0]['token']
 
 
 def url_to_id(url, wtype, timestamp):
@@ -83,12 +83,12 @@ def url_to_id(url, wtype, timestamp):
     except AssertionError:
         if url in EXCLUDED_URLS or wtype in IGNORED_TYPES:
             return []
-        r = json.loads(content)
+        r = json.loads(content.decode('utf-8'))
         print >>sys.stderr, "%s: %s (%s)" % (r['message'],
                                              r['parameters']['uri'], timestamp)
         return []
 
-    return json.loads(content)['data']
+    return json.loads(content.decode('utf-8'))['data']
 
 
 def sanitise_url(url, regex):
